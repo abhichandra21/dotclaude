@@ -1,0 +1,32 @@
+{
+  "theme": "tokyo-night",
+  "display": {
+    "style": "powerline",
+    "lines": [
+      {
+        "segments": {
+          "directory": {
+            "enabled": true,
+            "showBasename": false
+          },
+          "git": {
+            "enabled": true,
+            "showSha": false,
+            "showWorkingTree": true,
+            "showOperation": false,
+            "showTag": false,
+            "showTimeSinceCommit": false,
+            "showStashCount": false,
+            "showUpstream": false,
+            "showRepoName": false
+          },
+          "model": {
+            "enabled": true
+          }
+        }
+      }
+    ]
+  },
+  "budget": {
+  }
+}

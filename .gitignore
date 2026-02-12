@@ -1,0 +1,8 @@
+# Ignore marketplace downloaded content
+plugins/
+
+# Ignore downloaded command collections
+commands/
+
+# Ignore macOS files
+.DS_Store
