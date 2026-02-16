@@ -1,0 +1,43 @@
+{
+  "theme": "custom",
+  "display": {
+    "style": "powerline",
+    "colorCompatibility": "auto",
+    "lines": [
+      {
+        "segments": {
+          "directory": { "enabled": true, "showBasename": true },
+          "model": { "enabled": true }
+        }
+      },
+      {
+        "segments": {
+          "git": {
+            "enabled": true,
+            "showSha": false,
+            "showWorkingTree": true,
+            "showOperation": false,
+            "showTag": false,
+            "showTimeSinceCommit": false,
+            "showStashCount": false,
+            "showUpstream": false,
+            "showRepoName": false
+          }
+        }
+      }
+    ]
+  },
+  "colors": {
+    "custom": {
+      "directory": { "bg": "#2a2a2a", "fg": "#e0e0e0" },
+      "git": { "bg": "#3a3a3a", "fg": "#d0d0d0" },
+      "model": { "bg": "#4a4a4a", "fg": "#c0c0c0" },
+      "version": { "bg": "#7a7a7a", "fg": "#f0f0f0" }
+    }
+  },
+  "budget": {
+  },
+  "modelContextLimits": {
+    "sonnet": 200000
+  }
+}

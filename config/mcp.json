@@ -1,0 +1,67 @@
+{
+  "mcpServers": {
+    "aws-knowledge": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://knowledge-mcp.global.api.aws"
+      ],
+      "env": {}
+    },
+    "kubernetes": {
+      "command": "npx",
+      "args": [
+        "mcp-server-kubernetes"
+      ],
+      "description": "Kubernetes cluster management"
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-memory"
+      ],
+      "env": {}
+    },
+    "git": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/git"
+      ],
+      "env": {}
+    },
+    "promptheus": {
+      "type": "stdio",
+      "command": "/path/to/your/venv/bin/python",
+      "args": [
+        "-m",
+        "promptheus.main",
+        "mcp"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "<YOUR_API_KEY>"
+      }
+    },
+    "aws-api": {
+      "command": "uvx",
+      "timeout": 60000,
+      "disabled": false,
+      "args": [
+        "awslabs.aws-api-mcp-server@latest"
+      ],
+      "env": {
+        "AWS_API_MCP_PROFILE_NAME": "<YOUR_AWS_PROFILE>",
+        "AWS_REGION": "us-east-1"
+      }
+    },
+    "cloudflare": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://docs.mcp.cloudflare.com/mcp"
+      ]
+    }
+  }
+}
