@@ -403,6 +403,15 @@ review that nitpicks style.
 Aim for signal over volume. A review with 8 well-grounded findings is better than
 25 findings where half are style nitpicks.
 
+Only flag issues INTRODUCED by this change. Pre-existing problems in surrounding code
+are out of scope -- do not flag them even if you notice them while browsing context.
+Ask yourself: "Would the author fix this if they knew about it?" If the answer is
+"no, because it's intentional" or "no, because it predates this change," skip it.
+
+If you claim a change could break something elsewhere, you MUST identify the specific
+code that is provably affected. "This might break callers" is not a finding.
+"This breaks `handler.go:88` which passes a string where this now expects int" is.
+
 Do NOT flag the following -- these are noise, not findings:
 - Missing docstrings, comments, or type annotations on unchanged code
 - Import ordering or grouping style
@@ -412,6 +421,9 @@ Do NOT flag the following -- these are noise, not findings:
 - Adding logging to code that intentionally omits it
 - Whitespace, formatting, or line length unless it causes a real readability problem
 
+Keep your tone matter-of-fact. Do not praise ("Great job on...") or apologize.
+State the problem, state why it matters, suggest the fix. Move on.
+
 For each finding, assign a severity score from 1 to 10:
 - 9-10: Will cause data loss, security breach, or production outage
 - 7-8: Bug that will manifest under normal usage
@@ -419,7 +431,13 @@ For each finding, assign a severity score from 1 to 10:
 - 3-4: Performance concern, test gap, or API design issue
 - 1-2: Maintainability suggestion, minor readability improvement
 
-Include the score in your output as `[severity: N]` after each finding title.
+Also assign a confidence score from 0.0 to 1.0:
+- 0.9-1.0: Certain -- you read the code and verified the bug exists
+- 0.7-0.8: High -- strong evidence but depends on runtime behavior you cannot verify statically
+- 0.4-0.6: Medium -- plausible issue but depends on unstated assumptions about inputs or environment
+- 0.1-0.3: Low -- speculative, based on patterns rather than verified code paths
+
+Include both scores in your output as `[severity: N, confidence: X.X]` after each finding title.
 
 If the change involves strategic concerns (cost, team structure, training),
 note them briefly but do not deep-dive unless they affect correctness.
@@ -474,7 +492,7 @@ Bugs, logic errors, security vulnerabilities, or correctness problems that will 
 |---|-------|----------|-----------|----------|------|
 
 ### Details
-#### 1. <Issue title> `[severity: 9]`
+#### 1. <Issue title> `[severity: 9, confidence: 0.95]`
 **Location:** `path/to/file.go:42-55`
 **<model-a> said:** <quote or paraphrase>
 **<model-b> said:** <quote or paraphrase> (if multiple flagged)
@@ -538,10 +556,12 @@ Technical disagreements requiring engineering judgment.
 - [ ] `[7]` `path/to/file.go:88` -- <action> -- [category]
 ```
 
-**Synthesis rules for severity scores:**
-- Use the model-assigned severity score. If multiple models flag the same finding, use the highest score.
-- Drop findings scored 1-2 from the consolidated report -- count them in "Skipped (noise)" in Reviewer Stats.
-- Sort all tables and action items by severity descending.
+**Synthesis rules for severity and confidence:**
+- Use the model-assigned severity score. If multiple models flag the same finding, use the highest severity.
+- Use the model-assigned confidence score. If multiple models flag the same finding, use the highest confidence.
+- Drop findings with severity 1-2 from the consolidated report -- count them in "Skipped (noise)" in Reviewer Stats.
+- Drop findings with confidence below 0.4 unless multiple models independently flagged the same issue (agreement raises effective confidence).
+- Sort all tables and action items by severity descending, then by confidence descending within the same severity.
 
 ### Step 5: Present and Ask
 
