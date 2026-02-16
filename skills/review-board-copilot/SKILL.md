@@ -6,7 +6,8 @@ description: >
   review, synthesizes feedback, then optionally drives rebuttal rounds and consensus
   building. Uses Copilot subscription tokens instead of separate API keys.
   Trigger phrases include "copilot review", "review board copilot",
-  "multi-model review", or any request for Copilot-powered document review.
+  "multi-model review", "debate this", "copilot debate", or any request
+  for Copilot-powered document review or focused design debate.
 ---
 
 # Review Board (Copilot Multi-Model)
@@ -81,6 +82,19 @@ If the user chooses "Pick models", present the full discovered model list and le
 
 Store the selected models for use in all rounds.
 
+## Mode Detection
+
+This skill supports two modes. Detect the mode from the invocation arguments:
+
+- **Review mode** (default): `/review-board-copilot <file>` -- full 7-category review with optional rebuttal/consensus rounds. Any invocation where the first argument is NOT `debate`.
+- **Debate mode**: `/review-board-copilot debate <file> "question1" "question2"` -- focused design debate on specific questions against a reference document.
+
+**Detection rule:** If the first argument is literally `debate`, enter debate mode and parse remaining arguments as `<file> "question1" "question2" ...`. Otherwise, enter review mode (the existing workflow starting at Round 1).
+
+**If invoked as just `/review-board-copilot debate` with no further arguments**, ask for the file path and debate questions via `AskUserQuestion` (free-text input for questions).
+
+Everything below the mode split -- CLI invocation, model discovery, directory access, background tasks, context preamble, cleanup -- is shared between both modes.
+
 ## File Organization
 
 All intermediate files go in a temp working directory. Only the final deliverable(s) are saved next to the source document.
@@ -90,15 +104,18 @@ All intermediate files go in a temp working directory. Only the final deliverabl
 Create this directory at the start of the workflow.
 
 **Final deliverables** (saved next to the source doc):
-- `<docname>-review-consolidated.md` -- always produced (Round 1)
-- `<docname>-consensus.md` -- only if Round 3 runs
-- `<docname>-decisions.md` -- only if Round 4 runs
+- `<docname>-review-consolidated.md` -- always produced (review mode, Round 1)
+- `<docname>-consensus.md` -- only if Round 3 runs (review mode)
+- `<docname>-decisions.md` -- only if Round 4 runs (review mode)
+- `<docname>-debate.md` -- always produced (debate mode)
 
 **Temp files** (in the working directory, cleaned up at the end):
 - `context-preamble.md` -- project context prepended to doc for reviewers
-- `review-<model>.md` -- raw review from each model (e.g., `review-gpt-5.2.md`, `review-claude-sonnet-4.5.md`)
-- `rebuttal.md` -- Claude's rebuttal
-- `rebuttal-<model>.md` -- each model's response to the rebuttal
+- `review-<model>.md` -- raw review from each model (review mode)
+- `rebuttal.md` -- Claude's rebuttal (review mode)
+- `rebuttal-<model>.md` -- each model's response to the rebuttal (review mode)
+- `debate-<model>-q<N>.md` -- raw argument from each model per question (debate mode)
+- `counter-<model>-q<N>.md` -- counterargument responses from Round 2 (debate mode)
 
 **Cleanup:** When the workflow completes, ask the user whether to keep or delete the temp working directory. Default: delete.
 
@@ -579,6 +596,221 @@ Summarize the journey and list all output files. Proceed to **Cleanup**.
 
 ---
 
+## Debate Mode
+
+Focused design debate where external models argue specific questions against a reference document and Claude synthesizes the arguments. Use this instead of full review mode when you have targeted questions like "Is this component over-engineered?" or "Should we use approach A vs B?"
+
+Debate mode reuses the same infrastructure as review mode: CLI invocation, model discovery, panel selection, context preamble, directory access, background tasks, and cleanup.
+
+### Debate Round 1: Opening Arguments
+
+#### Step D1: Parse Arguments
+
+Extract the file path and 1-4 debate questions from the invocation arguments.
+
+- Arguments follow the pattern: `debate <file> "question1" "question2" ...`
+- If the file path is provided but no questions, ask via `AskUserQuestion` with a free-text option: "What design questions should the panel debate? (1-4 questions)"
+- If neither file nor questions are provided, ask for both.
+- Limit: 4 questions max per debate session. If more are provided, take the first 4 and inform the user.
+
+#### Step D2: Validate and Setup
+
+Same as review mode:
+
+1. Read the file with the `Read` tool. If it does not exist or is empty, report the error and stop.
+2. Verify Copilot CLI: `gh copilot -- --version 2>/dev/null`. If not available, stop.
+3. Run model selection (Step 0) if not already done.
+4. Create the temp working directory: `<doc_dir>/.review-board-<docname>/`
+5. Build the context preamble (Step 2.5 from review mode).
+6. Tell the user: "Debate panel: <list of models>. Questions: <numbered list>".
+
+#### Step D3: Collect Arguments
+
+Send each question to all models in parallel. Use the same CLI invocation pattern as review mode, but with a debate-specific prompt.
+
+For each model, for each question, run as a background task:
+
+```bash
+cd "$PROJECT_DIR" && gh copilot -- -p "You are a principal engineer participating in a design debate about the following document.
+
+$(cat "$PREAMBLE_FILE")
+
+$(cat "$INPUT_FILE")
+
+IMPORTANT: The project source code is in your current working directory ($PROJECT_DIR).
+Browse the codebase to ground your arguments in the actual implementation.
+
+Answer this specific design question:
+
+\"<QUESTION>\"
+
+Structure your response as:
+
+## Position
+State your position clearly: is this justified, over-engineered, under-engineered, or wrong approach?
+
+## Arguments For (why this design choice is justified)
+- Concrete technical arguments with references to the document and code
+- What problems does it solve? What breaks without it?
+
+## Arguments Against (why this might be unnecessary or wrong)
+- What would be simpler? What's the cost of this complexity?
+- Is there a real-world scenario where this matters, or is it theoretical?
+
+## Verdict
+Your recommendation: keep, simplify, remove, or replace with alternative.
+
+Be direct. Take a clear position. Do not hedge." --model "$MODEL" --add-dir "$PROJECT_DIR" --allow-all-tools --no-custom-instructions -s > "$OUTPUT_FILE" 2>/dev/null
+```
+
+Save output to: `<workdir>/debate-<model>-q<N>.md` (one file per model per question).
+
+All models and all questions run concurrently as background tasks. Use `TaskOutput` with `block: true` and `timeout: 300000` to collect results.
+
+If a model fails on a question, log the error and proceed with the others.
+
+#### Step D4: Synthesize
+
+Read all debate argument files and the original document. For each question, classify the panel's position:
+
+- **Consensus** -- all models agree on the same verdict (keep / remove / simplify / replace)
+- **Split** -- models disagree -- present both sides with argument strength
+
+Write `<docname>-debate.md` (next to the source doc):
+
+```markdown
+# Design Debate: <docname>
+
+Debate Panel: <list of model IDs>
+Synthesized by: Claude
+
+---
+
+## Q1: <question text>
+
+### Panel Positions
+| Model | Position | Confidence |
+|-------|----------|------------|
+| <model-a> | Keep / Simplify / Remove / Replace | Strong / Moderate / Weak |
+| <model-b> | Keep / Simplify / Remove / Replace | Strong / Moderate / Weak |
+| <model-c> | Keep / Simplify / Remove / Replace | Strong / Moderate / Weak |
+
+### Arguments For
+<strongest arguments from models that support the design, with attribution>
+
+### Arguments Against
+<strongest arguments from models that oppose the design, with attribution>
+
+### Claude's Assessment
+<Claude's own technical judgment weighing both sides, referencing the code and document>
+
+### Verdict: <Consensus: Keep / Split: 2 Keep, 1 Remove / etc.>
+
+---
+
+## Q2: <question text>
+
+(repeat for each question)
+
+---
+
+## Summary
+| # | Question | Verdict | Action |
+|---|----------|---------|--------|
+| 1 | <short question> | Consensus: Keep / Split: 2-1 | <recommended next step> |
+| 2 | <short question> | ... | ... |
+```
+
+**Confidence scoring:** Infer confidence from how strongly a model argues its position:
+- **Strong** -- clear position with multiple concrete arguments referencing code/doc
+- **Moderate** -- clear position but arguments are more theoretical
+- **Weak** -- hedged position, "it depends", or thin argument
+
+#### Step D5: Present and Ask
+
+Report the summary to the user in chat. Then ask:
+
+```
+Debate complete. Options:
+1) Stop here -- use the verdicts
+2) Round 2: Counterarguments -- I'll challenge the minority position (or challenge consensus if I disagree), send back to models, see if anyone changes their mind
+```
+
+Use `AskUserQuestion` with these two options.
+
+If the user stops here, proceed to **Cleanup**.
+
+---
+
+### Debate Round 2: Counterarguments (Optional)
+
+#### Step D6: Claude Writes Counterarguments
+
+For each question, identify which positions to challenge:
+
+- **If models disagree (split):** Write a counterargument challenging the weaker/minority position. The goal is to stress-test whether the minority has a point or if the majority is right.
+- **If all models agree but Claude disagrees:** Claude argues the opposing side directly. State why Claude disagrees and present the counter-case.
+- **If all models agree and Claude agrees:** Skip this question in Round 2 -- the consensus is solid.
+
+#### Step D7: Send Counterarguments to Models
+
+For each question being challenged, send the counterargument to all models using the same background task pattern:
+
+```
+You previously argued the following position on a design question:
+
+Question: "<QUESTION>"
+Your position: <model's original position summary>
+
+Here is a counterargument challenging your position:
+
+<counterargument text>
+
+Do you hold your position or change your mind?
+- If you change: explain what convinced you and state your new position.
+- If you hold: strengthen your argument -- address the counterargument directly.
+
+Be direct.
+```
+
+Save responses to: `<workdir>/counter-<model>-q<N>.md`
+
+#### Step D8: Present Final Positions
+
+Update the debate synthesis with Round 2 results. For each challenged question:
+
+- Note who changed position and who held
+- Update the verdict if the balance shifted
+- Present the final summary
+
+Append a `## Round 2: Counterarguments` section to `<docname>-debate.md`:
+
+```markdown
+## Round 2: Counterarguments
+
+### Q<N>: <question text>
+
+**Challenge:** <summary of the counterargument sent>
+
+| Model | Original Position | Final Position | Changed? |
+|-------|------------------|----------------|----------|
+| <model-a> | Keep | Keep | No -- strengthened argument |
+| <model-b> | Remove | Keep | Yes -- convinced by X |
+| <model-c> | Keep | Keep | No |
+
+**Final Verdict:** <updated verdict>
+
+---
+
+## Final Summary
+| # | Question | Round 1 Verdict | Round 2 Verdict | Action |
+|---|----------|-----------------|-----------------|--------|
+```
+
+Proceed to **Cleanup**.
+
+---
+
 ## Handling Strategic/Business Concerns
 
 If models raise cost, training, capacity planning, or other strategic concerns:
@@ -609,12 +841,12 @@ Use `AskUserQuestion` with "Delete temp files (Recommended)" and "Keep temp file
 
 | Tool | Purpose |
 |------|---------|
-| `AskUserQuestion` | File selection, model selection, round options, deadlocks, cleanup |
-| `Read` | Validate source doc, read review/rebuttal files |
+| `AskUserQuestion` | File selection, model selection, round/debate options, deadlocks, cleanup |
+| `Read` | Validate source doc, read review/rebuttal/debate argument files |
 | `Bash` | Check CLI, create/delete temp directory |
-| `Bash` (background) | Run `gh copilot` with different models in parallel |
+| `Bash` (background) | Run `gh copilot` with different models in parallel (review and debate) |
 | `TaskOutput` | Wait for background task completion |
-| `Write` | Save all output files |
+| `Write` | Save all output files (consolidated reviews, debate synthesis, etc.) |
 
 ## Error Handling
 
