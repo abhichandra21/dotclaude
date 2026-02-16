@@ -146,3 +146,11 @@ Follow these rules without deviation. No shortcuts. No exceptions.
 - Never commit into main/master branch directly. Ask the user to create a new branch
 - DO NOT use patch command
 - DO NOT ever commit anything without asking first
+
+## Skill File Locations
+
+Skills have two copies: the **active** copy Claude uses at `~/.claude/skills/<skill>/SKILL.md` and the **repo** copy at `skills/<skill>/SKILL.md` in this project.
+
+- **Always write changes to the active copy first** (`~/.claude/skills/<skill>/SKILL.md`)
+- **Then sync the same change to the repo copy** (`skills/<skill>/SKILL.md`)
+- Both files must stay identical
