@@ -437,7 +437,23 @@ Also assign a confidence score from 0.0 to 1.0:
 - 0.4-0.6: Medium -- plausible issue but depends on unstated assumptions about inputs or environment
 - 0.1-0.3: Low -- speculative, based on patterns rather than verified code paths
 
-Include both scores in your output as `[severity: N, confidence: X.X]` after each finding title.
+Format each finding header as a SINGLE LINE with all metadata inline:
+### [S:N C:X.X] Finding title | path/to/file.go:42-55 | introduced
+
+Where:
+- S:N is severity (integer 1-10)
+- C:X.X is confidence (decimal 0.0-1.0)
+- The pipe-separated fields are: title, location (full relative path from repo root), and whether the issue is "introduced" (by this change) or "pre-existing"
+- Example: ### [S:7 C:0.9] Missing null check in request handler | internal/handler.go:42-48 | introduced
+
+This format is both human-readable and regex-extractable. Use it consistently for every finding.
+
+At the END of your entire review, append a metadata footer:
+---REVIEW_META---
+findings_count: <total number of findings>
+categories_clean: <comma-separated list of categories with no issues>
+
+This footer helps the synthesizer compute accurate statistics without counting from prose.
 
 If the change involves strategic concerns (cost, team structure, training),
 note them briefly but do not deep-dive unless they affect correctness.
@@ -492,8 +508,7 @@ Bugs, logic errors, security vulnerabilities, or correctness problems that will 
 |---|-------|----------|-----------|----------|------|
 
 ### Details
-#### 1. <Issue title> `[severity: 9, confidence: 0.95]`
-**Location:** `path/to/file.go:42-55`
+#### 1. [S:9 C:0.95] <Issue title> | `path/to/file.go:42-55` | introduced
 **<model-a> said:** <quote or paraphrase>
 **<model-b> said:** <quote or paraphrase> (if multiple flagged)
 **Risk:** <what breaks>
@@ -557,11 +572,14 @@ Technical disagreements requiring engineering judgment.
 ```
 
 **Synthesis rules for severity and confidence:**
+- Extract severity and confidence from each finding's `### [S:N C:X.X]` header using regex: `/\[S:(\d+)\s+C:([\d.]+)\]/`
+- If a model deviates from the header format (e.g., writes `[severity: 7, confidence: 0.9]` in prose), still extract the values -- the synthesizer understands both formats.
 - Use the model-assigned severity score. If multiple models flag the same finding, use the highest severity.
 - Use the model-assigned confidence score. If multiple models flag the same finding, use the highest confidence.
 - Drop findings with severity 1-2 from the consolidated report -- count them in "Skipped (noise)" in Reviewer Stats.
 - Drop findings with confidence below 0.4 unless multiple models independently flagged the same issue (agreement raises effective confidence).
 - Sort all tables and action items by severity descending, then by confidence descending within the same severity.
+- Use the `---REVIEW_META---` footer from each review to populate the Reviewer Stats table (findings_count, categories_clean). If a footer is missing or malformed, count from the prose as fallback.
 
 ### Step 5: Present and Ask
 
@@ -582,14 +600,42 @@ If the user stops here, proceed to **Cleanup**.
 
 ## Round 2: Rebuttal (Optional)
 
-### Step 6: Claude Writes Rebuttal
+### Step 6: Claude Investigates and Writes Rebuttal
 
-Read the consolidated review and the actual code (using `Read` tool on affected files). For EACH finding, write one of:
+#### 6a: Investigate Findings Against the Code
+
+Read the consolidated review and the actual code (using `Read` tool on affected files referenced in findings). For EACH finding, investigate whether it holds up against the implementation. Claude has session context the models lacked -- codebase knowledge, architectural constraints, conversation history. Use that context.
+
+Classify each finding:
 
 - **Accept** -- the finding is valid, state what will change
 - **Reject** -- the finding is wrong, explain why with specific code references
 - **Partially Accept** -- core concern valid but suggested fix is wrong or scope is different
 - **Defer** -- valid but out of scope for this change
+
+#### 6b: Check If There's Anything to Rebut
+
+If Claude accepts ALL findings (no Reject or Partially Accept), do NOT silently proceed with a rubber-stamp rebuttal. Instead, tell the user:
+
+```
+I investigated all N findings against the code and agree with all of them. Sending "I agree with everything" back to the models would waste 3 expensive calls with no new information.
+
+If you disagree with any findings based on context I might not have, tell me which ones and why -- I'll incorporate your perspective into the rebuttal.
+
+Otherwise, we can skip Round 2 and work directly from the action items.
+```
+
+Use `AskUserQuestion` with:
+- "Skip Round 2 -- work from action items (Recommended)"
+- "I want to challenge specific findings"
+
+If the user provides findings to challenge, incorporate their reasoning into the rebuttal alongside Claude's own analysis, then proceed to 6c.
+
+If the user skips, jump to **Cleanup** or the next round the user selects.
+
+#### 6c: Write the Rebuttal
+
+Only proceed here if there are genuine disagreements (from Claude's investigation, the user's input, or both).
 
 Write to `<workdir>/rebuttal.md`:
 
