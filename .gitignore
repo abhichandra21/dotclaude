@@ -6,3 +6,6 @@ commands/
 
 # Ignore macOS files
 .DS_Store
+
+# direnv (contains auth tokens)
+.envrc
