@@ -1,133 +1,132 @@
-# My Claude Code Configuration
+# dotclaude
 
-Personal configuration for Claude Code CLI with custom commands, settings, and MCP integrations.
+My Claude Code configuration — behavior rules, custom skills, agent definitions, MCP servers, and a status line that shows what Claude is actually doing.
+
+## What this changes
+
+Out of the box, Claude Code is capable but generic. This configuration makes it opinionated:
+
+- **It doesn't act without understanding.** Before touching code, it checks git history, reads the existing pattern, and understands the why. When asked to diagnose something, it stops after analysis and waits — it doesn't immediately start making changes.
+- **It thinks about blast radius.** Destructive operations get a pause and a confirmation. For Kubernetes, every mutating command must name its context explicitly. No ambient context drift.
+- **It doesn't pile on changes.** One file, one change, test it, move on. If something fails three times the same way, it stops instead of trying a fourth approach.
+- **It argues back on constraints.** When told "we can't change X," it distinguishes between impossible and just-needs-approval, and presents options rather than accepting the constraint as final.
+
+The full ruleset lives in [CLAUDE.md](CLAUDE.md).
+
+## Status line
+
+A custom status line that mirrors a Powerlevel10k prompt: current directory, AWS/EKS session, virtualenv, git branch with dirty/ahead/behind indicators, model name, and context window usage colored green → yellow → red as it fills.
+
+```
+~/Data/Codebase/my-project | λ dev | main* | claude-sonnet-4-6 | 34%
+```
+
+Reads from `~/.aws_sessions` for the EKS indicator — customize the `case` statement in [statusline-command.sh](statusline-command.sh) to match your own profile names.
+
+## Skills
+
+### In this repo
+
+| Skill | What it does |
+|---|---|
+| `code-review-copilot` | Multi-model code review via GitHub Copilot CLI — sends diffs to GPT, Claude, and Gemini, synthesizes findings |
+| `promptheus` | Refines prompts using the Promptheus MCP server |
+| `review-board` | Document review board powered by multiple LLM CLIs |
+| `review-board-copilot` | Same as above but scoped to Copilot |
+| `writing-assistant` | Context-aware text rephrasing and improvement |
+
+### Marketplace (download separately)
+
+General-purpose skills available from the marketplace:
+
+- `algorithmic-art` — generative algorithmic art
+- `brand-guidelines` — extract and apply brand guidelines
+- `canvas-design` — canvas-based design tools
+- `frontend-design` — production-grade frontend UI generation
+- `internal-comms` — draft internal communications
+- `mcp-builder` — scaffold MCP servers
+- `rekhta-qafia` — Rekhta qafia/rhyming dictionary search
+- `skill-creator` — guide for creating new skills
+- `slack-gif-creator` — Slack GIF creation
+- `template-skill` — starter template for new skills
+- `theme-factory` — UI theme generation
+- `ac-triage-dependabot` — safely triage open Dependabot PRs
+- `ac-*` — private work-specific cluster health, log tracing, and operational skills
+- `web-artifacts-builder` — web artifact generation
+- `webapp-testing` — Playwright-based web app testing
+
+## Plugins
+
+Install with `claude plugin install <name>@<registry>`:
+
+| Plugin | Registry | What it does |
+|---|---|---|
+| `superpowers` | `claude-plugins-official` | Meta-skill framework: brainstorming, TDD, systematic debugging, plan writing, code review workflows |
+| `codex` | `openai-codex` | OpenAI Codex CLI integration |
+| `claude-hud` | `claude-hud` | Status line / HUD display |
+| `claude-md-management` | `claude-plugins-official` | CLAUDE.md creation and improvement tools |
+| `claude-code-setup` | `claude-plugins-official` | Setup and automation recommendations |
+| `gopls-lsp` | `claude-plugins-official` | Go language server (LSP) integration |
+| `firebase` | `claude-plugins-official` | Firebase project integration |
+
+## MCP Servers
+
+Configured in [config/mcp.json](config/mcp.json):
+
+| Server | What it does |
+|---|---|
+| `aws-knowledge` | AWS documentation search |
+| `kubernetes` | K8s cluster management |
+| `memory` | Persistent memory across sessions |
+| `git` | Git operations |
+| `promptheus` | Prompt refinement |
+| `aws-api` | AWS CLI operations |
+| `cloudflare` | Cloudflare documentation |
+
+## Agents
+
+Custom agent definitions in [agents/](agents/) — specialized subagents for Go, Python, Kubernetes, debugging, cloud architecture, and more. Dropped into `~/.claude/agents/` so Claude can dispatch them automatically.
+
+## Setup
+
+```bash
+# Clone wherever you keep dotfiles
+git clone <repo> ~/dotfiles/claude
+
+# Symlink or copy to ~/.claude
+cp CLAUDE.md ~/.claude/CLAUDE.md
+cp settings.json ~/.claude/settings.json
+cp config/mcp.json ~/.claude/config/mcp.json
+cp -r skills/* ~/.claude/skills/
+cp -r agents/* ~/.claude/agents/
+cp claude-powerline*.json ~/.claude/
+cp statusline-command.sh ~/.claude/
+```
+
+Then fill in your values:
+
+- `config/mcp.json` — replace `<YOUR_API_KEY>` and `<YOUR_AWS_PROFILE>`
+- `CLAUDE.md` — replace any environment-specific references with your own clusters, namespaces, and tooling
+- `statusline-command.sh` — update the `case` block with your AWS profile names
+- `settings.json` — adjust permissions to match the tools you actually use
 
 ## Structure
 
 ```
 .
-├── CLAUDE.md                      # Main instructions file (template - fill in your values)
-├── settings.json                  # Claude Code settings
+├── CLAUDE.md                       # Behavior rules and conventions
+├── settings.json                   # Permissions, hooks, plugins
 ├── config/
-│   └── mcp.json                  # MCP server configurations
-├── skills/                       # Custom skills
-│   ├── codex/
-│   ├── review-board/
-│   ├── review-board-copilot/
-│   ├── promptheus/
-│   └── writing-assistant/
-├── claude-powerline.json         # Powerline theme config
-├── claude-powerline-custom.json  # Custom powerline theme
-└── statusline-command.sh         # Status line script
+│   └── mcp.json                    # MCP server configurations
+├── skills/                         # Custom skills (see above)
+├── agents/                         # Custom agent definitions
+├── claude-powerline.json           # Powerline theme config
+├── claude-powerline-custom.json    # Custom powerline theme
+└── statusline-command.sh           # Status line script
 ```
-
-## Setup
-
-1. **Clone this repo to your preferred location**
-
-2. **Copy configuration files to Claude's directory:**
-   ```bash
-   # Copy main instructions
-   cp CLAUDE.md ~/.claude/CLAUDE.md
-
-   # Copy settings (or merge with existing)
-   cp settings.json ~/.claude/settings.json
-
-   # Copy MCP config (or merge with existing)
-   cp config/mcp.json ~/.claude/config/mcp.json
-
-   # Copy custom skills
-   cp -r skills/* ~/.claude/skills/
-
-   # Copy powerline configs (optional)
-   cp claude-powerline*.json ~/.claude/
-   cp statusline-command.sh ~/.claude/
-   ```
-
-3. **Update CLAUDE.md with your specific values:**
-   - Replace AWS account numbers, profiles, clusters
-   - Add your Grafana tokens and URLs
-   - Update Azure/K8s cluster information
-   - Fill in any other environment-specific details
-
-4. **Update config/mcp.json:**
-   - Replace `<YOUR_API_KEY>` with your actual Anthropic API key
-   - Replace `<YOUR_AWS_PROFILE>` with your AWS profile name
-   - Update Python venv path for promptheus if using it
-
-5. **Review settings.json:**
-   - Adjust permissions as needed for your workflow
-   - Update statusLine command if using custom powerline
-
-## What's Included
-
-### Custom Skills (in this repo)
-- **code-review-copilot** - GitHub Copilot-powered multi-model code review
-- **promptheus** - AI-powered prompt refinement via MCP
-- **review-board** - Multi-LLM document review using external CLIs
-- **review-board-copilot** - GitHub Copilot multi-model review board
-- **writing-assistant** - Context-aware text rephrasing and improvement
-
-### Marketplace Skills (download separately, not in repo)
-- **algorithmic-art** - Generative algorithmic art creation
-- **brand-guidelines** - Brand guideline extraction and application
-- **canvas-design** - Canvas-based design tools
-- **frontend-design** - Production-grade frontend UI generation
-- **internal-comms** - Internal communication drafting
-- **mcp-builder** - MCP server scaffolding and building
-- **rekhta-qafia** - Rekhta qafia/rhyming dictionary search
-- **skill-creator** - Guide for creating new skills
-- **slack-gif-creator** - Slack GIF creation
-- **template-skill** - Starter template for new skills
-- **theme-factory** - UI theme generation
-- **ac-triage-dependabot** - Safely triage open Dependabot PRs
-- **ac-\*** - Private work-specific cluster health, log tracing, and operational skills (not in repo)
-- **web-artifacts-builder** - Web artifact generation
-- **webapp-testing** - Playwright-based web app testing
-
-### Installed Plugins (install via `claude plugin install`)
-- **superpowers** (`superpowers@claude-plugins-official`) - Meta-skill framework: brainstorming, debugging, TDD, plan writing, code review workflows
-- **codex** (`codex@openai-codex`) - OpenAI Codex CLI integration
-- **claude-hud** (`claude-hud@claude-hud`) - Status line / HUD display
-- **claude-md-management** (`claude-md-management@claude-plugins-official`) - CLAUDE.md creation and improvement tools
-- **claude-code-setup** (`claude-code-setup@claude-plugins-official`) - Claude Code setup and automation recommendations
-- **gopls-lsp** (`gopls-lsp@claude-plugins-official`) - Go language server (LSP) integration
-- **firebase** (`firebase@claude-plugins-official`) - Firebase project integration
-
-### MCP Servers (config/mcp.json)
-- **aws-knowledge** - AWS documentation search
-- **kubernetes** - K8s cluster management
-- **memory** - Persistent memory across sessions
-- **git** - Git operations
-- **promptheus** - Prompt refinement
-- **aws-api** - AWS CLI operations
-- **cloudflare** - Cloudflare documentation
-
-### Key Features in CLAUDE.md
-- **Code quality standards** - No emojis, human-readable names, direct language
-- **Change management workflow** - Understand → Plan → One Change → Test → Commit
-- **Problem-solving methodology** - Challenge constraints, enumerate solutions
-- **Kubernetes safety rules** - No kubectl patch, always backup
-- **Critical thinking protocols** - Blast radius analysis, surgical operations
 
 ## Notes
 
-- **Only custom skills are in this repo** - Marketplace skills and plugin-provided skills are downloaded separately; see the full lists above
-- **Plugins install via** `claude plugin install <name>@<registry>` - versions will differ from those listed above
-- **Sensitive information has been redacted** - Fill in your own values
-- **This is a template** - Customize to your needs
-
-## Customization
-
-Feel free to:
-- Create your own custom skills in `skills/`
-- Modify CLAUDE.md instructions for your workflow
-- Add/remove MCP servers in config/mcp.json
-- Adjust settings.json permissions and hooks
-- Install command collections (like CCPlugins) separately in `~/.claude/commands/`
-
-## Security
-
-- Never commit real API keys or tokens
-- Keep sensitive environment information in your local ~/.claude/CLAUDE.md
-- Use this repo as a template, not a direct copy
+- Only custom skills are in this repo. Marketplace skills and plugin-provided skills install separately.
+- `commands/` is gitignored — command collections like CCPlugins install there and are project-specific.
+- Never commit real API keys. The `mcp.json` here uses placeholders; keep your real values in `~/.claude/config/mcp.json`.
