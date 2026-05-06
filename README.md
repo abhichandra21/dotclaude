@@ -61,12 +61,38 @@ Personal configuration for Claude Code CLI with custom commands, settings, and M
 
 ## What's Included
 
-### Custom Skills
-- **codex** - Codex CLI integration for OpenAI GPT models
-- **review-board** - Multi-LLM document review using external CLIs
-- **review-board-copilot** - GitHub Copilot-powered multi-model review
+### Custom Skills (in this repo)
+- **code-review-copilot** - GitHub Copilot-powered multi-model code review
 - **promptheus** - AI-powered prompt refinement via MCP
+- **review-board** - Multi-LLM document review using external CLIs
+- **review-board-copilot** - GitHub Copilot multi-model review board
 - **writing-assistant** - Context-aware text rephrasing and improvement
+
+### Marketplace Skills (download separately, not in repo)
+- **algorithmic-art** - Generative algorithmic art creation
+- **brand-guidelines** - Brand guideline extraction and application
+- **canvas-design** - Canvas-based design tools
+- **frontend-design** - Production-grade frontend UI generation
+- **internal-comms** - Internal communication drafting
+- **mcp-builder** - MCP server scaffolding and building
+- **rekhta-qafia** - Rekhta qafia/rhyming dictionary search
+- **skill-creator** - Guide for creating new skills
+- **slack-gif-creator** - Slack GIF creation
+- **template-skill** - Starter template for new skills
+- **theme-factory** - UI theme generation
+- **ac-triage-dependabot** - Safely triage open Dependabot PRs
+- **ac-\*** - Private work-specific cluster health, log tracing, and operational skills (not in repo)
+- **web-artifacts-builder** - Web artifact generation
+- **webapp-testing** - Playwright-based web app testing
+
+### Installed Plugins (install via `claude plugin install`)
+- **superpowers** (`superpowers@claude-plugins-official`) - Meta-skill framework: brainstorming, debugging, TDD, plan writing, code review workflows
+- **codex** (`codex@openai-codex`) - OpenAI Codex CLI integration
+- **claude-hud** (`claude-hud@claude-hud`) - Status line / HUD display
+- **claude-md-management** (`claude-md-management@claude-plugins-official`) - CLAUDE.md creation and improvement tools
+- **claude-code-setup** (`claude-code-setup@claude-plugins-official`) - Claude Code setup and automation recommendations
+- **gopls-lsp** (`gopls-lsp@claude-plugins-official`) - Go language server (LSP) integration
+- **firebase** (`firebase@claude-plugins-official`) - Firebase project integration
 
 ### MCP Servers (config/mcp.json)
 - **aws-knowledge** - AWS documentation search
@@ -86,8 +112,8 @@ Personal configuration for Claude Code CLI with custom commands, settings, and M
 
 ## Notes
 
-- **Marketplace skills/plugins NOT included** - Only custom skills are in this repo. Download marketplace skills separately (algorithmic-art, canvas-design, frontend-design, mcp-builder, etc.)
-- **Commands NOT included** - Install command collections like CCPlugins separately if needed
+- **Only custom skills are in this repo** - Marketplace skills and plugin-provided skills are downloaded separately; see the full lists above
+- **Plugins install via** `claude plugin install <name>@<registry>` - versions will differ from those listed above
 - **Sensitive information has been redacted** - Fill in your own values
 - **This is a template** - Customize to your needs
 
